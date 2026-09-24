@@ -34,9 +34,11 @@ São listas **JSON** em `brands`, não tabelas. Para mudar um item:
 
 Nunca grave a partir de uma leitura antiga. A Joey do Multica pode ter gravado no intervalo — gravar por cima de uma leitura velha apaga o que ela escreveu.
 
-Campos de cada cor: `role`, `hex`, `source`, `text_hex`, `background_hex`, `contrast_ratio`, `confirmed_by`, `confirmed_at`. Cor definida pelo Marcelo grava `source = confirmed`. Campos de cada fonte: `role`, `family`, `source`, `confirmed_by`, `confirmed_at`.
+Campos de cada cor: `role`, `hex`, `source`, `bg_light_hex`, `text_on_light_hex`, `contrast_light`, `bg_dark_hex`, `text_on_dark_hex`, `contrast_dark`, `confirmed_by`, `confirmed_at`. Cor definida pelo Marcelo grava `source = confirmed`. Os seis campos de fundo e contraste saem da ação `scale` — ver a skill `joey-cor-e-escala`.
 
-`background_hex` recebe o degrau da escala **100**–**900** da marca, nunca um hex avulso. O `hex` da cor da marca não muda em hipótese alguma.
+`brands.color_scales` é outra lista **JSON**, com a escala **100**–**900** de cada cor. Segue a mesma regra: leia, altere só a linha daquela cor, grave a lista inteira. Campos de cada fonte: `role`, `family`, `source`, `confirmed_by`, `confirmed_at`.
+
+Os fundos recebem degraus da escala **100**–**900** da marca, nunca um hex avulso. O `hex` da cor da marca não muda em hipótese alguma.
 
 ## 4. notes — sempre somar, nunca substituir
 
@@ -44,7 +46,7 @@ Leia o valor atual de `notes` e grave `valor atual + novo bloco`. Nunca substitu
 
 Seu bloco abre com `[**JOEY**-**N8N** ...]`. O da Joey do Multica abre com `[**JOEY** ...]`. Cada item aprovado, recusado ou reconfirmado cita o **id da mensagem** do Marcelo (`msg ...`), que vem no contexto da rodada. Sem id verificado, não grave aprovação.
 
-``` [**JOEY**-**N8N** **2026**-09-23 14:32] Aprovado por: marcelo @joey n8n colors.primary: declarado *azul* -> *#**1E5BC6*** (definido pelo Marcelo) · msg **4812** colors.primary.text_hex: *#**FFFFFF*** · contraste 7,4:1 (ferramenta 1.2.0) · msg **4815** Arquivo recebido pelo WhatsApp: [nome] -> brand_assets.[id] (logo_negativa) · msg **4823** Sem aprovação (medição): has_transparency medido (veredicto: transparente · 1.2.0) Pendente: logo_safe_area (padrão da fábrica não definido) ```
+``` [**JOEY**-**N8N** **2026**-09-23 14:32] Aprovado por: marcelo @joey n8n colors.primary: declarado *azul* -> *#**1E5BC6*** (definido pelo Marcelo) · msg **4812** colors.primary: fundos da escala (**100** e **800**) · contraste 19,2:1 e 11,3:1 (ferramenta 1.3.0) Arquivo recebido pelo WhatsApp: [nome] -> brand_assets.[id] (logo_negativa) · msg **4823** Sem aprovação (medição): has_transparency medido (veredicto: transparente · 1.2.0) Pendente: logo_safe_area (padrão da fábrica não definido) ```
 
 Medição também entra no registro. Sem aprovação não significa sem registro.
 
@@ -70,7 +72,7 @@ Medição nunca muda esse campo. Arquivo com `usable = true` e `confirmed_by = s
 
 ## 6. Reconfirmação — registro da pergunta e da resposta
 
-``` [**JOEY**-**N8N** **2026**-09-23 10:02] **RECONFIRMACAO** Item: colors.primary Aprovado antes: #**1E5BC6** - marcelo @joey n8n - 10/09/**2026** Proposto: #**1A4FA8** - informado pelo Marcelo · msg **4901** Pergunta: 23/09 09:58 - Resposta: *sim* 23/09 10:01 · msg **4903** Resultado: atualizado - confirmed_by marcelo_joey_n8n - confirmed_at 23/09 10:02 ```
+``` [**JOEY**-**N8N** **2026**-09-23 10:02] **RECONFIRMACAO** Item: colors.primary Aprovado antes: #**1E5BC6** - marcelo @joey n8n - 10/09/**2026** Proposto: #**1A4FA8** - informado pelo Marcelo; escala regerada só desta cor · msg **4901** Pergunta: 23/09 09:58 - Resposta: *sim* 23/09 10:01 · msg **4903** Resultado: atualizado - confirmed_by marcelo_joey_n8n - confirmed_at 23/09 10:02 ```
 
 Recusa usa o mesmo formato, com `Resultado: mantido - nao perguntar de novo por [valor proposto]`.
 
