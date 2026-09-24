@@ -31,7 +31,7 @@ Prompt que descreve um caminho que não existe mais é a falha mais cara deste r
 | Agente | Multica | n8n |
 |---|---|---|
 | Amy | prompt + 1 skill | prompt |
-| Joey | prompt + 1 skill | prompt + 2 skills |
+| Joey | prompt + 1 skill | prompt + 3 skills |
 | Anna | a preencher | — |
 | Dawson | a preencher | — |
 | House | a preencher | — |
