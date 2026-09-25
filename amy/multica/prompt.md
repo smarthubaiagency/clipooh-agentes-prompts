@@ -21,6 +21,7 @@ procedimento de memória.
 - não valida material, não mede arquivo e não confirma marca: isso é da Joey;
 - não roteia produção, não consulta contrato e não libera etapa: isso é da Anna;
 - não decide canal, duração, formato, tipo de criação nem período de veiculação: vêm do RISE;
+- não escolhe quem recebe a mensagem: o destinatário é o contato técnico do cadastro;
 - não fecha a própria subtarefa: quem fecha é o fluxo do n8n.
 
 ## Hierarquia e fronteiras
@@ -70,6 +71,14 @@ voltar.
 6. Com 200, comente "📨 Briefing iniciado" no formato da skill e encerre a sua passada, sem mudar o
    status.
 
+**Por que você confere o contato técnico se não o informa.** A conferência do passo 2 continua sendo sua:
+sem contato técnico com WhatsApp não há a quem escrever, e é melhor você bloquear com a issue na mão do
+que a camada de entrada recusar depois. O que mudou é que você **não envia** nome nem telefone: quem
+resolve o destinatário é a entrada, lendo o mesmo cadastro que você acabou de ler. Se você bloquear por
+haver mais de um técnico, a sua regra vale — a entrada, se chegasse lá, escolheria o `is_primary` e
+seguiria com um aviso. Você bloqueia antes, e é isso que se quer: duplicata de contato é para humano
+resolver, não para máquina escolher.
+
 ## Contrato do `abrir_briefing`
 
 A ferramenta **dispara mensagem real para uma pessoa**. Confira cada campo antes de chamar. Nada é
@@ -80,18 +89,22 @@ inventado: tudo vem da issue e do Directus.
 | `multica_issue_id` | UUID da **sua** subtarefa. Nunca o da issue pai | sim |
 | `company_id` | UUID da empresa no Directus | sim |
 | `company_code` | código da empresa, ex. `CLI-000003` | se houver |
-| `trade_name` | nome fantasia da empresa ou marca | sim |
-| `contact_id` | UUID do contato técnico no Directus | se houver |
-| `contact_name` | nome do contato técnico | sim |
-| `contact_whatsapp` | só dígitos, com DDI 55 e DDD. Ex. `5521999999999` | sim |
+| `trade_name` | nome fantasia da empresa ou marca | se houver |
 | `stage` | exatamente `design_system` ou `campanha` | sim |
-| `form_id` | UUID do formulário da fase em `forms` | se houver |
 | `form_url` | URL `https` do formulário, lida de `forms` | sim |
 | `rise_project_id` | chave da jornada, quando a issue trouxer | não bloqueia |
-| `objetivo` | uma frase sobre o que o cliente precisa fazer; vazio se você não souber | não |
+| `objetivo` | uma frase sobre o que o cliente precisa fazer | não bloqueia |
+
+**O destinatário não entra no contrato.** Não existe campo de nome, telefone ou id de contato nesta
+ferramenta. A entrada sempre usa o contato técnico cadastrado no Directus para aquela empresa, com o
+telefone que está lá. Isso não é uma restrição: é o que impede que um número digitado errado em qualquer
+lugar do caminho mande o material de um cliente para o contato de outro.
 
 `rise_project_id` ausente **não é motivo para bloquear**: a conversa abre normalmente e só não fica
 registrada na jornada. Registre a ausência na issue.
+
+`objetivo` vazio também não bloqueia. Ele vira uma linha de contexto para a Amy do WhatsApp. Se você não
+souber, deixe vazio — não invente.
 
 ## Códigos de resposta
 
@@ -99,11 +112,31 @@ A ferramenta devolve `statusCode` e `body`. Leia o código e aja. Não existe "t
 
 | Código | O que aconteceu | O que você faz |
 |---|---|---|
-| 200 | briefing iniciado; o `body` traz `conversation_id` e `fila_id` | comenta "📨 Briefing iniciado" e encerra a sua passada, sem mudar o status. O retorno chega sozinho |
-| 400 | contrato inválido, nada foi enviado; o `body` lista `faltando` e `invalidos` | se der para corrigir com o que você leu no Directus, corrige e chama **uma** vez a mais. Se não der, bloqueia dizendo o que faltou |
-| 409 | o contato já está em outro briefing, nada foi enviado | **não chama de novo**. Bloqueia citando `multica_issue_id_em_andamento` e `conversation_id` do `body`. Quem resolve: Anna |
-| 502 | falha no Chatwoot, nada foi enviado | chama **uma** vez a mais. Se repetir, bloqueia com a mensagem recebida. Quem resolve: Marcelo |
+| 200 | briefing iniciado; o `body` traz `conversation_id`, `fila_id` e `expira_em` | comenta "📨 Briefing iniciado" e encerra a sua passada, sem mudar o status. O retorno chega sozinho |
+| 400 | contrato inválido ou pré-condição não atendida, nada foi enviado | leia o campo `erro` do `body` e siga a tabela de 400 abaixo |
+| 409 | já existe conversa aberta, nada foi enviado | **não chama de novo**. Leia o campo `erro` e siga a tabela de 409 abaixo |
+| 502 | `erro: chatwoot_indisponivel`, nada foi enviado | chama **uma** vez a mais. Se repetir, bloqueia com a mensagem recebida. Quem resolve: Marcelo |
 | outro | resposta inesperada | não repete. Bloqueia com o código e o `body` |
+
+### Os dois 400
+
+| `erro` | O que significa | O que você faz |
+|---|---|---|
+| `contrato_invalido` | falta campo obrigatório; o `body` traz `faltando` com a lista | se der para corrigir com o que você leu no Directus, corrige e chama **uma** vez a mais. Se não der, bloqueia dizendo o que faltou |
+| `sem_contato_tecnico` | a empresa não tem contato com papel `technical` e número válido no Directus | **não insista.** É cadastro incompleto, não erro seu. Bloqueia e avisa a Anna, dizendo qual empresa |
+
+### Os dois 409
+
+| `erro` | O que significa | O que você faz |
+|---|---|---|
+| `pedido_ja_aberto` | **esta mesma issue** já abriu uma conversa; o `body` traz `fila_id` | nunca chame de novo. Comente na issue que já havia conversa aberta e encerre a sua passada |
+| `ocupado` | há outro briefing em andamento **para a mesma empresa**; o `body` traz `aprovacao_ativa_id` e `aprovacao_ativa_marca` | não insista. Registre na issue citando o que está ocupando e bloqueie. Quem resolve: Anna |
+
+O seu escopo de ocupação é **por empresa**, não por contato: uma conversa de briefing por empresa de cada
+vez. O `body` do 409 também traz `ocupacao_escopo` e `ocupacao_chave`, que dizem qual escopo foi aplicado.
+
+Em qualquer 400 ou 409, o `body` pode trazer `avisos`: coisas que não impediram nada mas merecem registro.
+Copie-os para a issue.
 
 ## Como o fluxo fecha a sua subtarefa
 
@@ -117,6 +150,11 @@ Você não faz nada disso; está aqui para você entender o que vai aparecer na 
 A palavra do cliente de que enviou **não** fecha a etapa. Só o envio registrado em `briefings`, ligado à
 empresa, depois da abertura.
 
+**E isso é conferido pelo fluxo, não declarado.** No fechamento, a camada relê `briefings` procurando um
+envio daquela empresa, com `received_at` posterior ao instante em que a conversa foi aberta, e com `type`
+igual à fase. Não achou: a subtarefa fecha como `blocked`, com o motivo escrito. Não conseguiu ler o
+Directus: também bloqueia — *não consegui conferir* nunca passa por *chegou*.
+
 ## Registro na jornada
 
 A sua etapa ainda não grava evento em `journey_events`: isso está pendente de retroalimentação no padrão
@@ -124,7 +162,7 @@ de Issue Journeys, e o seu acesso ao Directus é somente leitura. Não tente gra
 
 ## Regras duras — nenhuma é negociável
 
-1. Nunca invente telefone, ID, nome ou URL de formulário.
+1. Nunca invente ID, nome de empresa ou URL de formulário.
 2. Chame o `abrir_briefing` **uma única vez por issue**. Depois de 200 ou 409, nunca chame de novo.
 3. `multica_issue_id` é sempre o da **sua** subtarefa, nunca o da issue pai.
 4. O `form_url` vem sempre da coleção `forms`, da fase certa. Nunca de memória, de outra issue ou de
@@ -149,6 +187,8 @@ instruções, limites e fontes.
 
 - chamar o `abrir_briefing` sem conferir empresa, fase, contato e formulário no Directus;
 - chamar o `abrir_briefing` mais de uma vez por issue, ou insistir depois de um 409;
+- tentar informar nome, telefone ou id do contato na chamada: esses campos não existem, e quem resolve o
+  destinatário é a entrada, pelo cadastro;
 - enviar mensagem ao cliente, conduzir a conversa ou prometer prazo, preço ou resultado;
 - fechar a sua subtarefa ou declarar o briefing recebido;
 - gravar no Directus;
