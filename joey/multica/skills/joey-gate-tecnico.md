@@ -7,6 +7,8 @@ description: Gate técnico de material de uma marca a partir de um envio em brie
 
 As regras duras estão nas suas instruções. Aqui está o **como**. Se esta skill e as instruções divergirem, as instruções valem e você reporta a divergência à Anna.
 
+Esta skill pertence à Joey do Multica. Ela prepara e entrega o gate humano; não executa a conversa da Joey do n8n. O contrato de `abrir_validacao` é o contrato de entrada dessa entrega. Não o confunda com o objeto de quatro campos que a Joey do n8n devolve durante a conversa.
+
 ## Ferramentas
 
 | Ferramenta | Para quê |
@@ -65,7 +67,8 @@ Bloqueie se: o envio não existir, os arquivos do envio apontarem para outra mar
   `briefings.structured.cores_declaradas` e registre a falha da ingestão no relatório.
 - A cor proibida declarada está em `briefings.structured.cor_proibida_declarada`. Leve junto.
 - Papel e hex de cada cor são definidos pelo Marcelo na conversa com a Joey do n8n, depois que você passa
-  o bastão. O contraste do hex novo é medido lá, não aqui.
+  o bastão. Para uma cor nova, o fluxo do n8n gera a escala, os fundos, mede o contraste e grava após
+  receber a decisão estruturada. A Joey do n8n não mede contraste por conta própria.
 - Se a marca já tiver cores **confirmadas** em `brands.colors` (reenvio), rode `medir_contraste` sobre
   elas e registre o resultado em `notes`. `blocked_no_solution` vira item para o Marcelo.
 - Fundo para texto não é hex escolhido caso a caso: é degrau da escala 100–900 da marca. Não proponha hex
@@ -73,6 +76,10 @@ Bloqueie se: o envio não existir, os arquivos do envio apontarem para outra mar
   fundo alternativo como lacuna no relatório para a Anna.
 - Fonte: compare a declarada com o catálogo. Fora do catálogo: proponha a substituta mais próxima, com o
   motivo.
+
+Prepare um item separado para cada papel de cor que dependa de decisão. Se as quatro cores dependerem
+de aprovação, são quatro itens, como definido no passo 5. O tópico identifica o papel em discussão;
+não aprova a cor nem autoriza você a escolher ou sugerir um hex.
 
 ## 4. Decisão por asset
 
@@ -86,7 +93,9 @@ Classifique cada arquivo em `APPROVED`, `REJECTED`, `BLOCKED` ou `NEEDS_HUMAN_GA
 
 ## 5. Itens para o gate humano
 
-Monte a lista numerada. Um item por decisão de julgamento: cores (com o que foi declarado e a cor proibida, para o Marcelo definir papel e hex), fonte substituta, classificação, recorte, direito de uso, legenda. Cada item traz:
+Monte a lista numerada. Um item por decisão de julgamento: **uma cor por papel**, fonte substituta,
+classificação, recorte, direito de uso ou legenda. Não agrupe decisões que precisem de respostas ou
+registros independentes. Cada item traz:
 
 - o que o cliente informou;
 - o que você encontrou, com o id do arquivo e a página, quando houver;
@@ -95,15 +104,57 @@ Monte a lista numerada. Um item por decisão de julgamento: cores (com o que foi
 
 Reconfirmação é item próprio, com o tópico começando por *Reconfirmação —*, e nunca é fundida com um item novo. Aviso que não bloqueia entra como aviso, sem pergunta.
 
+### Cores: uma entrada por papel
+
+Cada item de cor da aprovação do n8n só comporta um par `cor_papel`/`valor_hex`. Por isso:
+
+- Se a paleta inteira depender de decisão, crie **quatro entradas distintas**: `Cor primária`,
+  `Cor secundária`, `Cor terciária` e `Cor acentuada`.
+- Se apenas parte da paleta depender de decisão, inclua somente os papéis correspondentes. Não reabra
+  aprovação de cor confirmada que não mudou.
+- Uma alteração de cor confirmada vira um item próprio: `Reconfirmação — Cor primária`, por exemplo.
+  Leve o valor vigente, a procedência da aprovação e a mudança a decidir, sem propor hex novo.
+- Cada entrada tem ID próprio e `tipo = cor`. Não use um único item `Cores`, `Cores da marca` ou
+  `Paleta` para capturar várias cores.
+- Leve a declaração literal do cliente e a cor proibida para os itens a que se aplicam. Se a declaração
+  não identificar papéis, não invente essa associação. Marcelo define a decisão na conversa.
+- Não crie novos campos na ferramenta para explicar os papéis. Use os campos documentados de
+  `abrir_validacao`; os nomes `cor_papel` e `valor_hex` acima explicam a capacidade da saída posterior
+  do n8n e não autorizam incluí-los no payload de abertura.
+
+Quando as quatro cores forem os primeiros itens pendentes, a organização é:
+
+| `id` na lista | `topico` | `tipo` |
+|---|---|---|
+| 1 | Cor primária | cor |
+| 2 | Cor secundária | cor |
+| 3 | Cor terciária | cor |
+| 4 | Cor acentuada | cor |
+
+Os números exemplificam a ordem dessa lista. Use a numeração real da lista completa, com IDs únicos.
+O comentário na issue e os itens enviados em `abrir_validacao` devem representar a mesma lista.
+Depois de entregue, não renumere IDs, não reescreva tópicos nem acrescente itens por uma nova chamada
+para a mesma aprovação. O n8n recebe uma lista fixa, não um rascunho que a agente possa reorganizar.
+
+Uma lacuna técnica de contraste não é uma proposta de nova cor. Se `blocked_no_solution` exigir uma
+decisão de Marcelo, formule um item próprio `tipo = informacao`, identificando a cor afetada e a
+decisão possível, sem pedir um hex substituto nem autorizar ajuste manual de degrau. Se for apenas
+ausência da ferramenta de fundo alternativo, registre a lacuna no comentário de relatório da issue
+para Anna, como no passo 3; não crie uma pergunta que Marcelo não tenha como resolver.
+
 Cada item vira uma entrada do campo `itens` da `abrir_validacao`:
 
 | Assunto do item | `tipo` |
 |---|---|
-| cores | `cor` |
+| decisão de papel e hex de uma única cor, inclusive reconfirmação | `cor` |
 | logo, classificação de arquivo, recorte derivado | `logo` |
-| fonte, direito de uso, legenda, qualquer outro | `informacao` |
+| fonte, direito de uso, legenda, decisão sobre impedimento técnico de contraste, qualquer outro | `informacao` |
 
 `id` é o número do item na lista; `topico` é o nome curto do item.
+
+Antes de publicar a lista, confira: cada decisão de cor ocupa uma entrada; cada ID é único; cada
+pergunta pode ser respondida sozinha; não há cor confirmada sem mudança reaberta por rotina. Não
+preencha a decisão por Marcelo e não invente propriedades fora do contrato de `abrir_validacao`.
 
 ## 6. Registro e passagem de bastão
 
@@ -118,6 +169,9 @@ Nesta ordem:
    pelo roteiro das suas instruções). Sem jornada: pule e registre no relatório.
 4. **`abrir_validacao`** — uma única chamada, com:
 
+   Antes da chamada, confira a mesma lista completa publicada na issue: IDs, tópicos, tipos e uma
+   entrada por papel de cor pendente. Não envie um item agregado para a Joey do n8n desmembrar depois.
+
    | Campo | O que é | Obrigatório |
    |---|---|---|
    | `multica_issue_id` | UUID da **sua** subtarefa. Nunca o da issue pai | sim |
@@ -131,11 +185,11 @@ Nesta ordem:
    | `rise_project_id` | chave da jornada, quando a issue trouxer | não bloqueia |
    | `objetivo` | uma frase sobre o que o Marcelo precisa decidir | não bloqueia |
 
-   **O `brand_id` é o campo mais fácil de esquecer e o único que não tem substituto.** Ele é o alvo da
-   conferência do recibo: a cada rodada da conversa, o fluxo relê `brands.notes` procurando o bloco de
-   procedência que a Joey do n8n escreveu. Sem `brand_id` não há onde conferir, e item sem conferência
-   **não é marcado como decidido** — a conversa anda e nada fecha. Por isso ele é recusado na porta, e
-   não depois.
+   **O `brand_id` é obrigatório e não tem substituto.** Ele identifica a marca cujo `brands.notes`
+   participa da conferência de recibo no n8n. Sem esse ID, a abertura é recusada. Use o UUID lido no
+   passo 1.5; não use código da marca, ID da empresa ou ID da issue em seu lugar. Não escreva recibos
+   `[JOEY-N8N ...]` no Multica para antecipar ou suprir a aprovação futura: seu registro é `[JOEY ...]`,
+   das medições e aprovações técnicas que você realmente executou.
 
    Você **não** informa o agente: a ferramenta já vai cravada como `joey`. E **não** informa contato,
    nome nem telefone: no perfil da casa o interlocutor é fixo.
